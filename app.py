@@ -1,19 +1,36 @@
 from flask import Flask, request, jsonify
-import joblib
 import torch
-import numpy as np
+import torch.nn as nn
 
 # Load the trained model
 model_path = 'solace_lstm_gb_model.pth'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class SolaceLSTM(torch.nn.Module):
-    def __init__(self, input_size, hidden_size, output_size_outcome, num_layers=3, dropout_rate=0.5, bidirectional=True):
+# LSTM GB
+# class SolaceLSTM(torch.nn.Module):
+#     def __init__(self, input_size, hidden_size, output_size_outcome, num_layers=3, dropout_rate=0.5, bidirectional=True):
+#         super(SolaceLSTM, self).__init__()
+#         self.lstm = torch.nn.LSTM(input_size, hidden_size, num_layers=num_layers,
+#                                   batch_first=True, dropout=dropout_rate, bidirectional=bidirectional)
+#         direction_factor = 2 if bidirectional else 1
+#         self.fc_outcome = torch.nn.Linear(hidden_size * direction_factor, output_size_outcome)
+
+#     def forward(self, x):
+#         lstm_out, _ = self.lstm(x)
+#         last_output = lstm_out[:, -1, :]  # Use the last output for classification
+#         return self.fc_outcome(last_output)
+
+# LSTM RF
+class SolaceLSTM(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size_outcome, num_layers=3, dropout_rate=0.5,
+                 bidirectional=True):
         super(SolaceLSTM, self).__init__()
-        self.lstm = torch.nn.LSTM(input_size, hidden_size, num_layers=num_layers,
-                                  batch_first=True, dropout=dropout_rate, bidirectional=bidirectional)
+        self.bidirectional = bidirectional
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers=num_layers,
+                            batch_first=True, dropout=dropout_rate, bidirectional=bidirectional)
         direction_factor = 2 if bidirectional else 1
-        self.fc_outcome = torch.nn.Linear(hidden_size * direction_factor, output_size_outcome)
+        self.fc_outcome = nn.Linear(hidden_size * direction_factor, output_size_outcome)
+        self.dropout = nn.Dropout(dropout_rate)
 
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
@@ -38,6 +55,7 @@ def predict():
         input_data = request.json['data']
         print("Received input data:", input_data)
         input_tensor = torch.tensor(input_data, dtype=torch.float32).to(device)
+        print("Input tensor shape:", input_tensor.shape)
 
         # Make predictions
         with torch.no_grad():
