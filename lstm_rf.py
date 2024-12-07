@@ -8,16 +8,17 @@ from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression
-from imblearn.over_sampling import SMOTE  # For SMOTE balancing
+from imblearn.over_sampling import SMOTE
 
 # Load and preprocess the data
 data = pd.read_csv('Processed_Scaled_Disease_Symptom_Data.csv')
 
-# Map categorical values to numeric
+# Map categorical values to numeric, including Gender
 symptom_columns = ['Fever', 'Cough', 'Fatigue', 'Difficulty Breathing']
 for col in symptom_columns:
     data[col] = data[col].map({'Yes': 1, 'No': 0})
 
+# Map 'Gender' before applying SMOTE
 data['Gender'] = data['Gender'].map({'Female': 0, 'Male': 1})
 data['Outcome Variable'] = data['Outcome Variable'].map({'Positive': 1, 'Negative': 0})
 
@@ -25,7 +26,7 @@ data['Outcome Variable'] = data['Outcome Variable'].map({'Positive': 1, 'Negativ
 scaler = StandardScaler()
 data[['Blood Pressure', 'Cholesterol Level']] = scaler.fit_transform(data[['Blood Pressure', 'Cholesterol Level']])
 
-# Increase sequence length to capture more symptom history
+# Increase sequence length to capture more symptom history, including 'Age' and 'Gender'
 sequence_length = 10
 
 def create_sequences(data, seq_length):
@@ -33,7 +34,7 @@ def create_sequences(data, seq_length):
     labels_outcome = []
     for i in range(len(data) - seq_length):
         seq = data.iloc[i:i + seq_length][
-            ['Fever', 'Cough', 'Fatigue', 'Difficulty Breathing', 'Blood Pressure', 'Cholesterol Level']].values
+            ['Fever', 'Cough', 'Fatigue', 'Difficulty Breathing', 'Blood Pressure', 'Cholesterol Level', 'Age', 'Gender']].values
         sequences.append(seq)
         labels_outcome.append(data.iloc[i + seq_length]['Outcome Variable'])
     return np.array(sequences), np.array(labels_outcome)
@@ -43,7 +44,7 @@ X_sequences, y_outcome_sequences = create_sequences(data, sequence_length)
 # Apply SMOTE for class balance
 smote = SMOTE(random_state=42)
 X_sequences_res, y_outcome_sequences_res = smote.fit_resample(X_sequences.reshape(X_sequences.shape[0], -1),
-                                                              y_outcome_sequences)
+                                                            y_outcome_sequences)
 X_sequences_res = X_sequences_res.reshape(-1, sequence_length, X_sequences.shape[2])
 
 # Define the LSTM Model with enhanced architecture (Stacked LSTM)
